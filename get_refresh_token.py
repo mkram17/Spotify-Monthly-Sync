@@ -16,7 +16,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 CLIENT_ID     = input("Paste your Spotify Client ID:     ").strip()
 CLIENT_SECRET = input("Paste your Spotify Client Secret: ").strip()
 
-REDIRECT_URI = "http://localhost:8888/callback"
+REDIRECT_URI = "http://127.0.0.1:8888/callback"
 SCOPES = "user-library-read playlist-modify-private playlist-read-private"
 
 auth_url = "https://accounts.spotify.com/authorize?" + urlencode({
@@ -48,6 +48,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 print("\nOpening browser for Spotify login...")
+print(f"If the browser doesn't open automatically, click this link:\n{auth_url}\n")
 webbrowser.open(auth_url)
 HTTPServer(("localhost", 8888), _Handler).handle_request()
 
