@@ -1,3 +1,4 @@
+import calendar
 import os
 import requests
 from datetime import datetime, timezone, timedelta
@@ -108,6 +109,12 @@ def add_tracks(token, playlist_id, uris):
         r.raise_for_status()
 
 
+def is_last_day_of_month():
+    today = datetime.now(timezone.utc)
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    return today.day == last_day
+
+
 def main():
     token   = get_access_token()
     user    = get_current_user(token)
@@ -117,35 +124,59 @@ def main():
     songs = get_recent_liked_songs(token, since_days=3)
     print(f"Found {len(songs)} recently liked song(s) to sync")
 
-    if not songs:
-        print("Nothing to do.")
-        return
-
-    by_month = {}
-    for song in songs:
-        key = song["added_at"].strftime("%B '%y")  # e.g. "April '26"
-        by_month.setdefault(key, []).append(song["uri"])
-
     existing = get_user_playlists(token, user_id)
 
-    for month_name, uris in by_month.items():
-        playlist_name = month_name
+    if songs:
+        by_month = {}
+        for song in songs:
+            key = song["added_at"].strftime("%B '%y")  # e.g. "April '26"
+            by_month.setdefault(key, []).append(song["uri"])
 
-        if playlist_name not in existing:
-            print(f"Creating playlist: {playlist_name}")
-            pid = create_playlist(token, user_id, playlist_name)
-            existing[playlist_name] = pid
-        else:
-            pid = existing[playlist_name]
+        for month_name, uris in by_month.items():
+            playlist_name = month_name
 
-        already_there = get_playlist_track_uris(token, pid)
-        new_uris = [u for u in uris if u not in already_there]
+            if playlist_name not in existing:
+                print(f"Creating playlist: {playlist_name}")
+                pid = create_playlist(token, user_id, playlist_name)
+                existing[playlist_name] = pid
+            else:
+                pid = existing[playlist_name]
+
+            already_there = get_playlist_track_uris(token, pid)
+            new_uris = [u for u in uris if u not in already_there]
+
+            if new_uris:
+                add_tracks(token, pid, new_uris)
+                print(f"Added {len(new_uris)} track(s) to '{playlist_name}'")
+            else:
+                print(f"No new tracks to add to '{playlist_name}'")
+    else:
+        print("No recently liked songs to sync.")
+
+    if is_last_day_of_month():
+        today = datetime.now(timezone.utc)
+        month_name = today.strftime("%B '%y")
+        songs_playlist = "Songs"
+
+        print(f"Last day of month — copying '{month_name}' into '{songs_playlist}'")
+
+        if month_name not in existing:
+            print(f"Monthly playlist '{month_name}' not found; nothing to copy.")
+            return
+
+        if songs_playlist not in existing:
+            print(f"Playlist '{songs_playlist}' not found; nothing to copy into.")
+            return
+
+        monthly_uris = list(get_playlist_track_uris(token, existing[month_name]))
+        already_in_songs = get_playlist_track_uris(token, existing[songs_playlist])
+        new_uris = [u for u in monthly_uris if u not in already_in_songs]
 
         if new_uris:
-            add_tracks(token, pid, new_uris)
-            print(f"Added {len(new_uris)} track(s) to '{playlist_name}'")
+            add_tracks(token, existing[songs_playlist], new_uris)
+            print(f"Added {len(new_uris)} track(s) from '{month_name}' to '{songs_playlist}'")
         else:
-            print(f"No new tracks to add to '{playlist_name}'")
+            print(f"All tracks from '{month_name}' are already in '{songs_playlist}'")
 
 
 if __name__ == "__main__":
