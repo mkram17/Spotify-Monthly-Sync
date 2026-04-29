@@ -123,13 +123,13 @@ def main():
 
     by_month = {}
     for song in songs:
-        key = song["added_at"].strftime("%B %Y")  # e.g. "April 2026"
+        key = song["added_at"].strftime("%B '%y")  # e.g. "April '26"
         by_month.setdefault(key, []).append(song["uri"])
 
     existing = get_user_playlists(token, user_id)
 
     for month_name, uris in by_month.items():
-        playlist_name = f"Liked - {month_name}"
+        playlist_name = month_name
 
         if playlist_name not in existing:
             print(f"Creating playlist: {playlist_name}")
