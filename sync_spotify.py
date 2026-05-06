@@ -102,7 +102,7 @@ def get_playlist_track_uris(token, playlist_id):
 def add_tracks(token, playlist_id, uris):
     for i in range(0, len(uris), 100):
         r = requests.post(
-            f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+            f"https://api.spotify.com/v1/playlists/{playlist_id}/items",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={"uris": uris[i : i + 100]},
         )
