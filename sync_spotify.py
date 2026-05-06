@@ -67,9 +67,9 @@ def get_user_playlists(token, user_id):
     return playlists
 
 
-def create_playlist(token, user_id, name):
+def create_playlist(token, name):
     r = requests.post(
-        f"https://api.spotify.com/v1/users/{user_id}/playlists",
+        "https://api.spotify.com/v1/me/playlists",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={
             "name":        name,
@@ -85,7 +85,7 @@ def get_playlist_track_uris(token, playlist_id):
     """Return a set of all track URIs already in the playlist."""
     uris = set()
     url = (
-        f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+        f"https://api.spotify.com/v1/playlists/{playlist_id}/items"
         "?fields=items(track(uri)),next&limit=100"
     )
     while url:
@@ -137,7 +137,7 @@ def main():
 
             if playlist_name not in existing:
                 print(f"Creating playlist: {playlist_name}")
-                pid = create_playlist(token, user_id, playlist_name)
+                pid = create_playlist(token, playlist_name)
                 existing[playlist_name] = pid
             else:
                 pid = existing[playlist_name]
