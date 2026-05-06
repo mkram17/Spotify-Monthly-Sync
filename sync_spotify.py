@@ -55,7 +55,7 @@ def get_recent_liked_songs(token, since_days=3):
 def get_user_playlists(token, user_id):
     """Return {playlist_name: playlist_id} for all playlists owned by user."""
     playlists = {}
-    url = f"https://api.spotify.com/v1/users/{user_id}/playlists?limit=50"
+    url = "https://api.spotify.com/v1/me/playlists?limit=50"
     while url:
         r = requests.get(url, headers={"Authorization": f"Bearer {token}"})
         r.raise_for_status()
