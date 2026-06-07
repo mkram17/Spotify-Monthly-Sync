@@ -1,8 +1,12 @@
 import calendar
 import os
+
+from dotenv import load_dotenv
 import requests
 from datetime import datetime, timezone, timedelta
 import base64
+
+load_dotenv()
 
 CLIENT_ID     = os.environ["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
