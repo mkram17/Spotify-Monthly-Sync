@@ -1,10 +1,10 @@
 import calendar
 import os
 
+import spotipy
 from dotenv import load_dotenv
-import requests
 from datetime import datetime, timezone, timedelta
-import base64
+from spotipy.oauth2 import SpotifyOAuth
 
 load_dotenv()
 
@@ -12,38 +12,30 @@ CLIENT_ID     = os.environ["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
 REFRESH_TOKEN = os.environ["SPOTIFY_REFRESH_TOKEN"]
 
+SCOPES = "user-library-read playlist-modify-private playlist-read-private"
 
-def get_access_token():
-    creds = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
-    r = requests.post(
-        "https://accounts.spotify.com/api/token",
-        headers={
-            "Authorization": f"Basic {creds}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data={"grant_type": "refresh_token", "refresh_token": REFRESH_TOKEN},
+
+def create_spotify_client():
+    """Create a spotipy client authorized as the user via the refresh token."""
+    auth_manager = SpotifyOAuth(
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        redirect_uri="http://127.0.0.1:8888/callback",
+        scope=SCOPES,
+        open_browser=False,
     )
-    r.raise_for_status()
-    return r.json()["access_token"]
+    # Use the stored refresh token to obtain a valid access token
+    token_info = auth_manager.refresh_access_token(REFRESH_TOKEN)
+    return spotipy.Spotify(auth=token_info["access_token"])
 
 
-def get_current_user(token):
-    r = requests.get("https://api.spotify.com/v1/me",
-                     headers={"Authorization": f"Bearer {token}"})
-    r.raise_for_status()
-    return r.json()
-
-
-def get_recent_liked_songs(token, since_days=3):
+def get_recent_liked_songs(sp, since_days=3):
     """Return liked songs added within the last `since_days` days."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
     songs = []
-    url = "https://api.spotify.com/v1/me/tracks?limit=50"
-    while url:
-        r = requests.get(url, headers={"Authorization": f"Bearer {token}"})
-        r.raise_for_status()
-        data = r.json()
-        for item in data["items"]:
+    results = sp.current_user_saved_tracks(limit=50)
+    while results:
+        for item in results["items"]:
             added_at = datetime.fromisoformat(item["added_at"].replace("Z", "+00:00"))
             if added_at < cutoff:
                 return songs  # items are newest-first; stop early
@@ -52,65 +44,47 @@ def get_recent_liked_songs(token, since_days=3):
                 "name":     item["track"]["name"],
                 "added_at": added_at,
             })
-        url = data.get("next")
+        results = sp.next(results) if results["next"] else None
     return songs
 
 
-def get_user_playlists(token, user_id):
+def get_user_playlists(sp, user_id):
     """Return {playlist_name: playlist_id} for all playlists owned by user."""
     playlists = {}
-    url = "https://api.spotify.com/v1/me/playlists?limit=50"
-    while url:
-        r = requests.get(url, headers={"Authorization": f"Bearer {token}"})
-        r.raise_for_status()
-        data = r.json()
-        for pl in data["items"]:
+    results = sp.current_user_playlists(limit=50)
+    while results:
+        for pl in results["items"]:
             if pl["owner"]["id"] == user_id:
                 playlists[pl["name"]] = pl["id"]
-        url = data.get("next")
+        results = sp.next(results) if results["next"] else None
     return playlists
 
 
-def create_playlist(token, name):
-    r = requests.post(
-        "https://api.spotify.com/v1/me/playlists",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json={
-            "name":        name,
-            "public":      False,
-            "description": "Auto-generated monthly liked-songs playlist",
-        },
+def create_playlist(sp, user_id, name):
+    playlist = sp.user_playlist_create(
+        user=user_id,
+        name=name,
+        public=False,
+        description="Auto-generated monthly liked-songs playlist",
     )
-    r.raise_for_status()
-    return r.json()["id"]
+    return playlist["id"]
 
 
-def get_playlist_track_uris(token, playlist_id):
-    """Return a set of all track URIs already in the playlist."""
+def get_playlist_track_uris(sp, playlist_id):
+    """Return a set of track URIs in the given playlist."""
     uris = set()
-    url = (
-        f"https://api.spotify.com/v1/playlists/{playlist_id}/items"
-        "?fields=items(track(uri)),next&limit=100"
-    )
-    while url:
-        r = requests.get(url, headers={"Authorization": f"Bearer {token}"})
-        r.raise_for_status()
-        data = r.json()
-        for item in data["items"]:
-            if item.get("track"):
-                uris.add(item["track"]["uri"])
-        url = data.get("next")
+    results = sp.playlist_items(playlist_id)
+    while results:
+        for item in results["items"]:
+            if item.get("item"):
+                uris.add(item["item"]["uri"])
+        results = sp.next(results) if results["next"] else None
     return uris
 
 
-def add_tracks(token, playlist_id, uris):
+def add_tracks(sp, playlist_id, uris):
     for i in range(0, len(uris), 100):
-        r = requests.post(
-            f"https://api.spotify.com/v1/playlists/{playlist_id}/items",
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json={"uris": uris[i : i + 100]},
-        )
-        r.raise_for_status()
+        sp.playlist_add_items(playlist_id, uris[i : i + 100])
 
 
 def is_last_day_of_month():
@@ -120,15 +94,15 @@ def is_last_day_of_month():
 
 
 def main():
-    token   = get_access_token()
-    user    = get_current_user(token)
+    sp = create_spotify_client()
+    user = sp.current_user()
     user_id = user["id"]
     print(f"Logged in as: {user.get('display_name', user_id)}")
 
-    songs = get_recent_liked_songs(token, since_days=3)
+    songs = get_recent_liked_songs(sp, since_days=3)
     print(f"Found {len(songs)} recently liked song(s) to sync")
 
-    existing = get_user_playlists(token, user_id)
+    existing = get_user_playlists(sp, user_id)
 
     if songs:
         by_month = {}
@@ -141,16 +115,16 @@ def main():
 
             if playlist_name not in existing:
                 print(f"Creating playlist: {playlist_name}")
-                pid = create_playlist(token, playlist_name)
-                existing[playlist_name] = pid
+                playlist_id = create_playlist(sp, user_id, playlist_name)
+                existing[playlist_name] = playlist_id
             else:
-                pid = existing[playlist_name]
+                playlist_id = existing[playlist_name]
 
-            already_there = get_playlist_track_uris(token, pid)
+            already_there = get_playlist_track_uris(sp, playlist_id)
             new_uris = [u for u in uris if u not in already_there]
 
             if new_uris:
-                add_tracks(token, pid, new_uris)
+                add_tracks(sp, playlist_id, new_uris)
                 print(f"Added {len(new_uris)} track(s) to '{playlist_name}'")
             else:
                 print(f"No new tracks to add to '{playlist_name}'")
@@ -172,12 +146,12 @@ def main():
             print(f"Playlist '{songs_playlist}' not found; nothing to copy into.")
             return
 
-        monthly_uris = list(get_playlist_track_uris(token, existing[month_name]))
-        already_in_songs = get_playlist_track_uris(token, existing[songs_playlist])
+        monthly_uris = list(get_playlist_track_uris(sp, existing[month_name]))
+        already_in_songs = get_playlist_track_uris(sp, existing[songs_playlist])
         new_uris = [u for u in monthly_uris if u not in already_in_songs]
 
         if new_uris:
-            add_tracks(token, existing[songs_playlist], new_uris)
+            add_tracks(sp, existing[songs_playlist], new_uris)
             print(f"Added {len(new_uris)} track(s) from '{month_name}' to '{songs_playlist}'")
         else:
             print(f"All tracks from '{month_name}' are already in '{songs_playlist}'")
