@@ -1,4 +1,4 @@
-name: Spotify Monthly Playlist Sync
+name: Sync Liked Songs to Monthly Playlist
 
 on:
   schedule:
@@ -21,9 +21,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Spotify sync
+      - name: Sync liked songs
         env:
           SPOTIFY_CLIENT_ID:     ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
-        run: python sync_spotify.py
+        run: python sync_liked_songs.py
