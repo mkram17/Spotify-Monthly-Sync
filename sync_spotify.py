@@ -76,8 +76,8 @@ def get_playlist_track_uris(sp, playlist_id):
     results = sp.playlist_items(playlist_id)
     while results:
         for item in results["items"]:
-            if item.get("item"):
-                uris.add(item["item"]["uri"])
+            if item.get("track"):
+                uris.add(item["track"]["uri"])
         results = sp.next(results) if results["next"] else None
     return uris
 
