@@ -72,12 +72,16 @@ def get_user_playlists(sp, user_id):
     return playlists
 
 
-def create_playlist(sp, user_id, name):
-    playlist = sp.user_playlist_create(
-        user=user_id,
-        name=name,
-        public=False,
-        description="Auto-generated monthly liked-songs playlist",
+def create_playlist(sp, name):
+    # Spotify now returns 403 for the user-scoped create endpoint that
+    # spotipy's user_playlist_create() calls, so post to me/playlists instead.
+    playlist = sp._post(
+        "me/playlists",
+        payload={
+            "name": name,
+            "public": False,
+            "description": "Auto-generated monthly liked-songs playlist",
+        },
     )
     return playlist["id"]
 
@@ -127,7 +131,7 @@ def main():
 
             if playlist_name not in existing:
                 print(f"Creating playlist: {playlist_name}")
-                playlist_id = create_playlist(sp, user_id, playlist_name)
+                playlist_id = create_playlist(sp, playlist_name)
                 existing[playlist_name] = playlist_id
             else:
                 playlist_id = existing[playlist_name]
