@@ -12,7 +12,7 @@ CLIENT_ID     = os.environ["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
 REFRESH_TOKEN = os.environ["SPOTIFY_REFRESH_TOKEN"]
 
-SCOPES = "user-library-read playlist-modify-private playlist-read-private"
+SCOPES = "user-library-read playlist-modify-private playlist-modify-public playlist-read-private"
 
 
 def create_spotify_client():
@@ -26,6 +26,18 @@ def create_spotify_client():
     )
     # Use the stored refresh token to obtain a valid access token
     token_info = auth_manager.refresh_access_token(REFRESH_TOKEN)
+
+    # A refresh token is permanently bound to the scopes granted when it was
+    # authorized, so verify it actually carries what this script needs.
+    granted = set(token_info.get("scope", "").split())
+    missing = set(SCOPES.split()) - granted
+    if missing:
+        raise SystemExit(
+            f"Refresh token is missing scope(s): {', '.join(sorted(missing))}. "
+            f"Granted: {', '.join(sorted(granted)) or '(none reported)'}. "
+            "Re-run get_refresh_token.py and update the SPOTIFY_REFRESH_TOKEN secret."
+        )
+
     return spotipy.Spotify(auth=token_info["access_token"])
 
 

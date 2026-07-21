@@ -17,7 +17,7 @@ CLIENT_ID     = input("Paste your Spotify Client ID:     ").strip()
 CLIENT_SECRET = input("Paste your Spotify Client Secret: ").strip()
 
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
-SCOPES = "user-library-read playlist-modify-private playlist-read-private"
+SCOPES = "user-library-read playlist-modify-private playlist-modify-public playlist-read-private"
 
 auth_url = "https://accounts.spotify.com/authorize?" + urlencode({
     "client_id":     CLIENT_ID,
