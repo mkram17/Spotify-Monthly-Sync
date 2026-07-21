@@ -1,10 +1,14 @@
 import os
+from zoneinfo import ZoneInfo
 
 import spotipy
 from dotenv import load_dotenv
 from spotipy.oauth2 import SpotifyOAuth
 
 load_dotenv()
+
+# All month boundaries use the user's local timezone so playlist names line up.
+LOCAL_TZ = ZoneInfo("America/New_York")
 
 CLIENT_ID     = os.environ["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
@@ -85,3 +89,8 @@ def add_tracks(sp, playlist_id, uris):
     """Add track URIs to a playlist, batching within the API's 100-item limit."""
     for i in range(0, len(uris), 100):
         sp.playlist_add_items(playlist_id, uris[i : i + 100])
+
+
+def playlist_name_for_month(dt):
+    """Return a playlist name like "April '26" for the given datetime."""
+    return dt.strftime("%B '%y")

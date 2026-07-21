@@ -1,0 +1,31 @@
+name: Sync Monthly Playlist into Songs
+
+on:
+  schedule:
+    # Days 28-31 at 23:00 UTC (evening in America/New_York). The script itself
+    # only acts on the actual last day of the month; other days are a no-op.
+    - cron: "0 23 28-31 * *"
+  workflow_dispatch:          # Lets you trigger it manually from GitHub
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Copy monthly playlist into Songs
+        env:
+          SPOTIFY_CLIENT_ID:     ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        run: python sync_monthly_to_songs.py
